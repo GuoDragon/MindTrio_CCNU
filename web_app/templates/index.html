@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>句间关系分析系统</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+            transition: all 0.5s ease;
+        }
+        .input-section {
+            width: 100%;
+            height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.5s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: #f5f5f5;
+        }
+        .input-section.hide {
+            transform: translateX(-100%);
+        }
+        textarea {
+            width: 80%;
+            min-height: 100px;
+            max-height: 80vh;
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            overflow-y: auto;
+        }
+        textarea:focus {
+            border-color: #4CAF50;
+            outline: none;
+            box-shadow: 0 0 5px rgba(76,175,80,0.3);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .result-section {
+            width: 50%;
+            height: 100vh;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            display: none;
+            position: absolute;
+            left: 0;
+            top: 0;
+            box-sizing: border-box;
+        }
+        .result-section.show {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .result-section .section-title {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .sentence-blocks-container {
+            width: 90%;
+            max-width: 800px;
+        }
+        .sentence-block {
+            margin: 10px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+        .sentence-block:hover {
+            background-color: #e9ecef;
+            border-left: 4px solid #4CAF50;
+        }
+        .sentence-block.active {
+            background-color: #e9ecef;
+            border-left: 4px solid #4CAF50;
+        }
+        .detail-panel {
+            position: fixed;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50%;
+            background-color: white;
+            padding: 20px;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        .detail-panel.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .detail-content {
+            width: 90%;
+            max-width: 800px;
+            margin: 15px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .detail-content p {
+            margin: 15px 0;
+            line-height: 1.6;
+            font-size: 16px;
+            word-break: break-word;
+        }
+        .detail-content strong {
+            color: #333;
+            margin-right: 10px;
+            min-width: 60px;
+            display: inline-block;
+        }
+        .feedback-buttons {
+            width: 90%;
+            max-width: 800px;
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            margin-bottom: 40px;
+            padding: 0 0 20px;
+        }
+        .feedback-buttons button {
+            flex: 1;
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+        .feedback-buttons button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            margin-top: 20px;
+            color: #333;
+            font-size: 18px;
+        }
+        .section-title {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4CAF50;
+        }
+        .correct {
+            background-color: #4CAF50;
+        }
+        .incorrect {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="input-section" id="inputSection">
+            <h1>句间关系分析系统</h1>
+            <input type="file" id="fileInput" accept=".pdf,.docx" style="margin-bottom: 15px;" />
+            <textarea id="inputText" placeholder="请输入要分析的文章内容..."></textarea>
+            <button onclick="analyzeText()">开始分析</button>
+        </div>
+        <div class="result-section" id="resultSection">
+            <h2 class="section-title">分析结果</h2>
+            <div class="sentence-blocks-container" id="sentenceBlocks"></div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">正在分析中...</div>
+        </div>
+    </div>
+    
+    <div class="detail-panel" id="detailPanel">
+        <h2 class="section-title">详细信息</h2>
+        <div class="detail-content">
+            <p><strong>原句：</strong><span id="detailSentence"></span></p>
+            <p><strong>分类：</strong><span id="detailClassification"></span></p>
+            <p><strong>理由：</strong><span id="detailReason"></span></p>
+        </div>
+        <div class="feedback-buttons">
+            <button class="correct" onclick="submitFeedback(currentSentenceId, true)">正确</button>
+            <button class="incorrect" onclick="submitFeedback(currentSentenceId, false)">错误</button>
+        </div>
+        <button onclick="resetAnalysis()">重新分析</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.2.0/mammoth.browser.min.js"></script>
+    <script>
+        let currentSentenceId = null;
+        let analysisResults = [];
+
+        // 裁剪说明内容，只保留第一个T:或S:开头及其后内容
+        function extractDialogueStart(text) {
+            const match = text.match(/(^|\n)[ \t]*(T|S)[:：]/);
+            if (match) {
+                return text.slice(match.index);
+            }
+            return text;
+        }
+
+        // 自动调整文本框大小
+        const textarea = document.getElementById('inputText');
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // 文件上传并自动读取内容
+        document.getElementById('fileInput').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const textarea = document.getElementById('inputText');
+            if (file.name.endsWith('.pdf')) {
+                // 读取 PDF
+                const reader = new FileReader();
+                reader.onload = async function() {
+                    const typedarray = new Uint8Array(this.result);
+                    try {
+                        const pdf = await pdfjsLib.getDocument({data: typedarray}).promise;
+                        let text = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            text += content.items.map(item => item.str).join(' ') + '\n';
+                        }
+                        textarea.value = extractDialogueStart(text);
+                        textarea.dispatchEvent(new Event('input'));
+                    } catch (err) {
+                        alert('PDF文件解析失败！');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } else if (file.name.endsWith('.docx')) {
+                // 读取 Word
+                const reader = new FileReader();
+                reader.onload = function() {
+                    mammoth.extractRawText({arrayBuffer: reader.result})
+                        .then(result => {
+                            textarea.value = extractDialogueStart(result.value);
+                            textarea.dispatchEvent(new Event('input'));
+                        })
+                        .catch(() => {
+                            alert('Word文件解析失败！');
+                        });
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('仅支持 PDF 或 docx 文件');
+            }
+        });
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function resetAnalysis() {
+            // 隐藏结果和详情面板
+            document.getElementById('resultSection').classList.remove('show');
+            document.getElementById('detailPanel').classList.remove('show');
+
+            // 显示输入区域
+            document.getElementById('inputSection').classList.remove('hide');
+
+            // 清空输入框
+            document.getElementById('inputText').value = '';
+
+            // 重置变量
+            currentSentenceId = null;
+            analysisResults = [];
+        }
+
+        async function analyzeText() {
+            const text = document.getElementById('inputText').value.trim();
+            console.log("前端输入内容：", text);
+            if (!text) {
+                alert('请输入文章内容');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+                const results = await response.json();
+                analysisResults = results;
+                const inputSection = document.getElementById('inputSection');
+                const resultSection = document.getElementById('resultSection');
+                
+                // 隐藏输入区域，显示结果区域
+                inputSection.classList.add('hide');
+                resultSection.classList.add('show');
+                
+                // 显示分析结果
+                const sentenceBlocks = document.getElementById('sentenceBlocks');
+                sentenceBlocks.innerHTML = '';
+                
+                results.forEach((result, index) => {
+                    const block = document.createElement('div');
+                    block.className = 'sentence-block';
+                    block.textContent = result.sentence;
+                    block.onmouseenter = () => showDetail(index);
+                    sentenceBlocks.appendChild(block);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                alert('分析过程中出现错误');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showDetail(index) {
+            currentSentenceId = index;
+            const result = analysisResults[index];
+            const detailPanel = document.getElementById('detailPanel');
+            
+            // 更新详情面板内容
+            document.getElementById('detailSentence').textContent = result.sentence;
+            document.getElementById('detailClassification').textContent = result.classification;
+            document.getElementById('detailReason').textContent = result.reason;
+            
+            // 显示详情面板
+            detailPanel.classList.add('show');
+            
+            // 更新句子块的激活状态
+            const blocks = document.querySelectorAll('.sentence-block');
+            blocks.forEach((block, i) => {
+                block.classList.toggle('active', i === index);
+            });
+            
+            // 调整面板内容
+            const content = document.querySelector('.detail-content');
+            const buttons = document.querySelector('.feedback-buttons');
+            const contentHeight = content.scrollHeight;
+            const buttonsHeight = buttons.scrollHeight;
+            const windowHeight = window.innerHeight;
+            const maxHeight = windowHeight * 0.9;
+            const totalHeight = contentHeight + buttonsHeight + 160; // 增加总高度，包含更大的底部间距
+            
+            // 设置面板高度
+            detailPanel.style.height = Math.min(totalHeight, maxHeight) + 'px';
+            
+            // 确保内容完全显示
+            if (totalHeight > maxHeight) {
+                content.style.maxHeight = (maxHeight - buttonsHeight - 160) + 'px';
+                content.style.overflowY = 'auto';
+            } else {
+                content.style.maxHeight = 'none';
+                content.style.overflowY = 'visible';
+            }
+        }
+
+        async function submitFeedback(resultIndex, isCorrect) {
+            const resultData = analysisResults[resultIndex];
+            if (!resultData) {
+                console.error("无法找到索引对应的结果数据:", resultIndex);
+                alert("发生内部错误，无法提交反馈。");
+                return;
+            }
+
+            // 禁用按钮防止重复点击
+            const buttons = document.querySelector('.feedback-buttons');
+            buttons.style.pointerEvents = 'none';
+            buttons.style.opacity = '0.5';
+
+            // 准备要发送到后端的数据包
+            const payload = {
+                sentence: resultData.sentence,
+                classification: resultData.classification,
+                reason: resultData.reason,
+                is_correct: isCorrect
+            };
+
+            try {
+                const response = await fetch('/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('反馈已提交，并成功存入数据库！');
+                } else {
+                    alert('反馈提交失败！');
+                }
+            } catch (error) {
+                console.error('Feedback Error:', error);
+                alert('提交反馈时发生网络错误');
+            } finally {
+                // 重新启用按钮
+                buttons.style.pointerEvents = 'auto';
+                buttons.style.opacity = '1';
+            }
+        }
+    </script>
+</body>
+</html> 
