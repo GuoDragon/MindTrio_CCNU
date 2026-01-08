@@ -1,13 +1,15 @@
+# Web框架和数据库
 flask==2.3.3
 mysql-connector-python==8.1.0
+
+# 工具库
 tabulate==0.9.0
 regex==2023.6.3
-transformers==4.57.3
-accelerate==0.22.0
+
+# MindSpore生态系统
+mindspore>=2.3.0
+mindnlp>=0.3.0
+
+# Tokenization支持
 sentencepiece==0.1.99
 protobuf==4.21.12
-mindspore==2.7.0
-mindnlp==0.5.0rc2
-peft==0.6.2
-datasets==2.14.6
-pandas==2.0.3

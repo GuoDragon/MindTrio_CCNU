@@ -6,9 +6,34 @@ from tabulate import tabulate
 import os
 import uuid
 import re
-import torch
-from transformers import pipeline
+import mindspore as ms
+from mindnlp.transformers import AutoModelForCausalLM, AutoTokenizer
 import random
+import argparse
+import sys
+
+# 解析命令行参数
+def parse_args():
+    parser = argparse.ArgumentParser(description='Chinese Sentence Relation Analysis Web App')
+    parser.add_argument(
+        '--model-path',
+        type=str,
+        default=None,
+        help='Path to the model directory (default: from env MODEL_PATH or D:\\hw\\merge\\merged_model)'
+    )
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=5000,
+        help='Port to run Flask app on (default: 5000)'
+    )
+    parser.add_argument(
+        '--host',
+        type=str,
+        default='127.0.0.1',
+        help='Host to bind Flask app to (default: 127.0.0.1)'
+    )
+    return parser.parse_args()
 
 app = Flask(__name__)
 
@@ -20,41 +45,78 @@ DB_CONFIG = {
     'database': 'relation_analysis'
 }
 
-# 本地模型配置
-# TODO: 模型下载后将路径替换为实际本地路径
-MODEL_ID = r"D:\hw\merge\merged_model"
+# 解析命令行参数
+args = parse_args()
 
-# Few-shot 示例
+# 本地模型配置（优先级：命令行参数 > 环境变量 > 默认值）
+MODEL_ID = (
+    args.model_path or
+    os.environ.get('MODEL_PATH') or
+    r"D:\hw\merge\merged_model"
+)
+
+print(f"使用模型路径: {MODEL_ID}")
+
+# Few-shot 示例（优化为2个示例以提升推理速度）
 FEW_SHOT_EXAMPLES = """
     1、输入：第一个问题是什么问题？诗中哪个字统领全篇？
-    输出：扩展。原因：前半句话针对"第一各问题"的内容提出问题，后半句话对其进行了扩展，补充回答了答案是"诗中哪个字统领全篇"，所以属于扩展关系。
+    输出：扩展。原因：前半句提出问题，后半句进行了扩展。
 
-    2、输入：作为染坊主，他其实是精明的、能干的、勤劳的；所以他能够当上纤夫的头脑，能够做好染坊行业的行会的首领，并且一做就是九年。
-    输出：因果。原因：前半句话强调了他的精明能干，后半句话通过"所以"强调了他的精明能干所导致的结果，所以属于因果关系。
-
-    3、输入：海鸟是一个胆怯的形象，它想干嘛？写这些其他的海鸟是为了干什么呢？
-    输出：并列。原因：前后两部分分别针对同一主题的不同方面提出了问题，两者间相互平行独立，所以属于并列关系。
-
-    4、输入：虽然我们至今不能确认这个送的友人是谁，但是李白所包含的这个真挚的情感是不是能让我们感动
-    输出：比较。原因：使用'虽然...但是...'句式，前半部分说明了友人仍然未知的情况，后半部分则转折强调了李白真挚的情感，所以属于比较关系。
-
-    5、输入：如果看完了，你把笔放下。
-    输出：其他。原因：因为该句子属于时序或条件关系，所以属于其他关系。
+    2、输入：海鸟是一个胆怯的形象，它想干嘛？写这些其他的海鸟是为了干什么呢？
+    输出：并列。原因：前后两部分分别针对不同方面提问，相互平行独立。
 """
 
 # 模型加载 - 在脚本启动时加载模型，只加载一次
+print("=" * 60)
 print(f"正在从 {MODEL_ID} 加载模型...")
+print("=" * 60)
 try:
-    PIPE = pipeline(
-        "text-generation",
-        model=MODEL_ID,
-        dtype=torch.float16
+    # 加载tokenizer
+    print("[1/3] 加载tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_ID,
+        trust_remote_code=True
     )
-    print("模型加载完成。")
+    print("     [OK] Tokenizer加载成功")
+
+    # 加载模型
+    print("[2/3] 加载模型（这可能需要几分钟）...")
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_ID,
+        ms_dtype=ms.float16,
+        trust_remote_code=True
+    )
+    print("     [OK] 模型加载成功")
+
+    # 设置为推理模式
+    print("[3/3] 设置推理模式...")
+    model.set_train(False)
+    print("     [OK] 推理模式设置完成")
+
+    # 修复pad_token问题
+    if tokenizer.pad_token_id == tokenizer.eos_token_id:
+        print("     [修复] pad_token与eos_token相同，正在修复...")
+        # 尝试使用unk_token作为pad_token
+        if tokenizer.unk_token_id is not None:
+            tokenizer.pad_token_id = tokenizer.unk_token_id
+            print(f"     [OK] 使用unk_token作为pad_token: {tokenizer.unk_token_id}")
+        else:
+            # 如果没有unk_token，使用词表中的第一个token
+            tokenizer.pad_token_id = 0
+            print("     [OK] 使用token_id=0作为pad_token")
+
+    print("=" * 60)
+    print("[SUCCESS] 模型加载完成！应用已准备就绪。")
+    print("=" * 60)
 except Exception as e:
-    print(f"模型加载失败: {e}")
+    print("=" * 60)
+    print(f"[ERROR] 模型加载失败: {e}")
     print("请确保模型文件已正确下载到指定路径。")
-    PIPE = None
+    print("=" * 60)
+    import traceback
+    traceback.print_exc()
+    model = None
+    tokenizer = None
 
 FIVE_CLASSES = ["并列", "扩展", "比较", "因果", "其他"]  # 只有五种分类
 
@@ -241,7 +303,7 @@ def call_model(user_input):
     """
     调用模型分析单个文本单元，并返回符合格式的结果。
     """
-    if PIPE is None:
+    if model is None or tokenizer is None:
         return {"sentence": user_input, "classification": "错误", "reason": "模型未成功加载，请检查模型路径是否正确。"}
 
     print(f"--- 分析单元: {user_input[:20]}... ---")    # 打印日志
@@ -266,30 +328,60 @@ def call_model(user_input):
     ]
 
     # 构建 chat prompt
-    chat_prompt = PIPE.tokenizer.apply_chat_template(
+    chat_prompt = tokenizer.apply_chat_template(
         messages,
         tokenize=False,             # 返回字符串，而不是直接返回 token id
         add_generation_prompt=True  # 在文本末尾加上提示生成的特殊标记
     )
 
     # 设置模型生成文本时的终止符
-    terminators = [PIPE.tokenizer.eos_token_id]  # 默认终止符
-    eot_token_id = PIPE.tokenizer.convert_tokens_to_ids("<|eot_id|>")  # 自定义终止符
-    if eot_token_id is not None:
-        terminators.append(eot_token_id)  # 遇到其中一个终止符就结束生成
+    terminators = [tokenizer.eos_token_id]  # 默认终止符
+    try:
+        eot_token_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")  # 自定义终止符
+        if eot_token_id is not None and eot_token_id != tokenizer.unk_token_id:
+            terminators.append(eot_token_id)  # 遇到其中一个终止符就结束生成
+    except Exception:
+        pass  # EOT token不存在时忽略
 
     # 模型生成
-    outputs = PIPE(
-        chat_prompt,
-        max_new_tokens=1024,
-        eos_token_id=terminators,
-        do_sample=True,  # 使用采样策略而非贪心
-        temperature=0.7,
-        top_p=0.9        # 累积概率约束采样
-    )
+    print("    [推理] 开始tokenize...")
+    # 1. Tokenize输入
+    inputs = tokenizer(chat_prompt, return_tensors="ms")
+    input_ids = inputs["input_ids"]
+    attention_mask = inputs.get("attention_mask", None)  # 获取attention_mask
+    print(f"    [推理] Tokenize完成，输入长度: {input_ids.shape[1]} tokens")
 
-    # 处理模型输出
-    generated_text = outputs[0]["generated_text"][len(chat_prompt):].strip()
+    # 2. 模型生成
+    print("    [推理] 开始模型推理（可能需要几秒到几分钟）...")
+    import time
+    start_time = time.time()
+
+    # 构建generate参数
+    generate_kwargs = {
+        "max_new_tokens": 128,  # 进一步降低到128
+        "eos_token_id": terminators,
+        "pad_token_id": tokenizer.pad_token_id,
+        "do_sample": False,     # 使用贪心搜索，速度更快
+        "temperature": 0.7,
+        "top_p": 0.9
+    }
+
+    # 如果有attention_mask，则传入
+    if attention_mask is not None:
+        generate_kwargs["attention_mask"] = attention_mask
+        print("    [推理] 使用attention_mask")
+    else:
+        print("    [推理] 警告：没有attention_mask")
+
+    outputs = model.generate(input_ids, **generate_kwargs)
+
+    elapsed_time = time.time() - start_time
+    print(f"    [推理] 推理完成，耗时: {elapsed_time:.2f}秒")
+
+    # 3. 解码输出（跳过输入部分）
+    print("    [推理] 解码输出...")
+    generated_ids = outputs[0][input_ids.shape[1]:]
+    generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
     # 截取 之后的内容
     think_end = generated_text.find("")
     if think_end != -1:
@@ -428,4 +520,5 @@ def init_db():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, port=5000)
+    print(f"启动Flask应用于 http://{args.host}:{args.port}")
+    app.run(debug=False, host=args.host, port=args.port)  # Temporarily disable debug mode
