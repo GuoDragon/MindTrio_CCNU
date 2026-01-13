@@ -199,12 +199,12 @@ model.save_pretrained(merged_path)
 
 ### 本地环境搭建
 1. 为便于环境搭建，推荐使用 anaconda 单独创建虚拟环境`conda create -n mindtrio python=3.10`
-2. 安装 GPU 版本 Pytorch `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121` ，或 CPU 版本 `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu`
-3. 安装 `requirements.txt` 中的依赖包 `pip install -r requirements.txt`
+2. 安装 `requirements.txt` 中的依赖包 `pip install -r requirements.txt`
 
 ### 使用脚本
-1. 提前将微调合并后的模型下载下来，并将 `app.py` 中第 25 行的 `MODEL_ID` 变量修改为实际模型路径
-2. 在虚拟环境中运行 `python app.py`，预计输出
+1. 提前将微调合并后的模型下载下来
+2. 通过传参的方式调用 `app.py`，将模型路径作为参数传入，如 `python app.py --model_path YOUR_PATH`
+3. 预计输出
     ```bash
     正在从 YOUR_PATH 加载模型...
     Device set to use cuda:0
@@ -221,4 +221,4 @@ model.save_pretrained(merged_path)
     * Debugger is active!
     * Debugger PIN: 113-062-594
     ```
-3. 在浏览器中打开 `http://127.0.0.1:5000` 后，就可以进行系统的使用
+4. 在浏览器中打开 `http://127.0.0.1:5000` 后，就可以进行系统的使用
