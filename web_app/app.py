@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-import mysql.connector
+import sqlite3
 from datetime import datetime
 import json
 from tabulate import tabulate
@@ -38,12 +38,7 @@ def parse_args():
 app = Flask(__name__)
 
 # 数据库配置
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': 'root',
-    'database': 'relation_analysis'
-}
+DB_PATH = 'relation_analysis.db'  # SQLite 数据库文件路径
 
 # 解析命令行参数
 args = parse_args()
@@ -404,9 +399,11 @@ def call_model(user_input):
     return result
 
 
-# 通过配置参数连接本地 MySQL 数据库，并返回连接对象
+# 通过配置参数连接本地 SQLite 数据库，并返回连接对象
 def get_db_connection():
-    return mysql.connector.connect(**DB_CONFIG)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  # 使查询结果可以通过列名访问
+    return conn
 
 
 def format_db_results(results):
@@ -417,19 +414,16 @@ def format_db_results(results):
     if not results:
         return []
 
-    # 获取字段名
-    fields = [desc[0] for desc in results[0].cursor.description]
-
     # 格式化每一行数据
     formatted_results = []  # 保存格式化后的字典结果
     for row in results:  # 遍历每一行数据库返回的数据
         formatted_row = {}
-        for i, field in enumerate(fields):
+        for key in row.keys():
             # 处理日期时间格式
-            if isinstance(row[i], datetime):
-                formatted_row[field] = row[i].strftime('%Y-%m-%d %H:%M:%S')
+            if isinstance(row[key], datetime):
+                formatted_row[key] = row[key].strftime('%Y-%m-%d %H:%M:%S')
             else:
-                formatted_row[field] = row[i]
+                formatted_row[key] = row[key]
         formatted_results.append(formatted_row)
 
     return formatted_results
@@ -476,7 +470,7 @@ def feedback():
     接收带有用户判断的完整分析结果，并将其存入数据库
     """
     data = request.json         # 期望接收包含 {sentence, classification, reason, is_correct} 的对象
-    conn = get_db_connection()  # 连接到 MySQL 数据库，返回一个连接对象 conn
+    conn = get_db_connection()  # 连接到 SQLite 数据库，返回一个连接对象 conn
     cursor = conn.cursor()      # 通过 conn 创建一个数据库游标，用于执行 SQL 语句
 
     now = datetime.now()        # 当前数据的存储时间
@@ -485,7 +479,7 @@ def feedback():
     cursor.execute('''
         INSERT INTO analysis_results
         (sentence, classification, reason, is_correct, created_at, feedback_time)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?)
         ''', (data['sentence'], data['classification'], data['reason'],
          data['is_correct'], now, now))
 
@@ -503,11 +497,11 @@ def init_db():
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS analysis_results (
-            id INT AUTO_INCREMENT PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             sentence TEXT NOT NULL,
             classification VARCHAR(50) NOT NULL,
             reason TEXT NOT NULL,
-            is_correct BOOLEAN,
+            is_correct INTEGER,
             created_at DATETIME NOT NULL,
             feedback_time DATETIME
         )
