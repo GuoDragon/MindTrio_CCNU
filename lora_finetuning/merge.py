@@ -9,18 +9,46 @@ mindspore.set_context(mode=mindspore.PYNATIVE_MODE, device_target="Ascend", devi
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 
+# 参数解析
+import argparse
+import os
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='MindSpore LoRA Merge Script')
+    parser.add_argument('--base-model', type=str, default=None,
+                       help='Base model name or path')
+    parser.add_argument('--lora-path', type=str, default=None,
+                       help='Path to LoRA checkpoint')
+    parser.add_argument('--output-path', type=str, default=None,
+                       help='Output path for merged model')
+    return parser.parse_args()
+
+args = parse_args()
+
 # 查看版本信息
 print(f"mindnlp版本: {mindnlp.__version__}")
 print(f"mindspore版本: {mindspore.__version__}")
 
-# 基础模型名称
-base_model_name = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
+# 基础模型名称（命令行参数 > 环境变量 > 默认值）
+base_model_name = (
+    args.base_model or
+    os.environ.get('BASE_MODEL') or
+    'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
+)
 
 # 训练好的 LoRA checkpoint 路径
-lora_path = "/home/ma-user/work/output/checkpoint-1380"
+lora_path = (
+    args.lora_path or
+    os.environ.get('LORA_PATH') or
+    "/home/ma-user/work/output/checkpoint-1380"
+)
 
 # 合并后模型的保存目录
-merged_path = "/home/ma-user/work/merged_model"
+merged_path = (
+    args.output_path or
+    os.environ.get('MERGED_PATH') or
+    "/home/ma-user/work/merged_model"
+)
 
 print(f"基础模型: {base_model_name}")
 print(f"LoRA权重路径: {lora_path}")

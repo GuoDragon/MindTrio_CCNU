@@ -21,14 +21,40 @@ from transformers import (
 # LoRA相关
 from peft import LoraConfig, TaskType, get_peft_model
 
+# 参数解析
+import argparse
+import os
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='MindSpore LoRA Training Script')
+    parser.add_argument('--train-data', type=str, default=None,
+                       help='Path to training data JSON file')
+    parser.add_argument('--val-data', type=str, default=None,
+                       help='Path to validation data JSON file')
+    parser.add_argument('--model-name', type=str, default=None,
+                       help='Base model name or path')
+    parser.add_argument('--output-dir', type=str, default=None,
+                       help='Output directory for checkpoints')
+    return parser.parse_args()
+
+args = parse_args()
+
 # 查看版本信息
 print(f"mindnlp版本: {mindnlp.__version__}")
 print(f"mindspore版本: {mindspore.__version__}")
 
 
-# 数据路径
-train_path = "/home/ma-user/work/data/train.json"
-val_path = "/home/ma-user/work/data/val.json"
+# 数据路径（命令行参数 > 环境变量 > 默认值）
+train_path = (
+    args.train_data or
+    os.environ.get('TRAIN_DATA_PATH') or
+    "/home/ma-user/work/data/train.json"
+)
+val_path = (
+    args.val_data or
+    os.environ.get('VAL_DATA_PATH') or
+    "/home/ma-user/work/data/val.json"
+)
 
 # 读取数据
 df_train = pd.read_json(train_path)
@@ -44,10 +70,16 @@ print(f"验证集样本数: {len(ds_val)}")
 print("\n数据集前3个样本:")
 
 # 加载tokenizer
-model_name = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
+model_name = (
+    args.model_name or
+    os.environ.get('MODEL_NAME') or
+    'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
+)
+print(f"使用模型: {model_name}")
+
 tokenizer = AutoTokenizer.from_pretrained(
-    model_name, 
-    use_fast=False, 
+    model_name,
+    use_fast=False,
     trust_remote_code=True
 )
 
@@ -143,8 +175,15 @@ model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
 
 # 定义训练参数
-args = TrainingArguments(
-    output_dir="./output",                    # 输出目录
+output_dir = (
+    args.output_dir or
+    os.environ.get('OUTPUT_DIR') or
+    "./output"
+)
+print(f"输出目录: {output_dir}")
+
+args_training = TrainingArguments(
+    output_dir=output_dir,                    # 输出目录
     per_device_train_batch_size=4,            # batch size
     gradient_accumulation_steps=5,            # 梯度累积步数
     logging_steps=10,                         # 日志记录间隔
@@ -155,8 +194,8 @@ args = TrainingArguments(
 )
 
 print("训练参数配置完成！")
-print(f"有效batch size: {args.per_device_train_batch_size * args.gradient_accumulation_steps}")
-print(f"总训练步数: {len(tokenized_train) // (args.per_device_train_batch_size * args.gradient_accumulation_steps) * args.num_train_epochs}")
+print(f"有效batch size: {args_training.per_device_train_batch_size * args_training.gradient_accumulation_steps}")
+print(f"总训练步数: {len(tokenized_train) // (args_training.per_device_train_batch_size * args_training.gradient_accumulation_steps) * args_training.num_train_epochs}")
 
 # 自定义Trainer类，确保输入数据显式移动到NPU
 class NPUTrainer(Trainer):
@@ -171,7 +210,7 @@ class NPUTrainer(Trainer):
 # 创建Trainer
 trainer = NPUTrainer(
     model=model,
-    args=args,
+    args=args_training,
     train_dataset=tokenized_train,
     data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True),
 )
