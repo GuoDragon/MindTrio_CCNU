@@ -21,10 +21,6 @@
 
 #### 数据处理流程
 ```python
-# 数据路径
-train_path = "/home/ma-user/work/data/train.json"
-val_path = "/home/ma-user/work/data/val.json"
-
 # 读取数据
 df_train = pd.read_json(train_path)
 df_val = pd.read_json(val_path)
@@ -194,31 +190,67 @@ model.save_pretrained(merged_path)
 - 训练过程将生成output目录，保存checkpoint文件
 - 可通过日志查看loss、epoch等训练指标
 
+用户可通过传参的方式使用`train.py`，如
+```bash
+python train.py --train-data /home/ma-user/work/data/train.json --val-data /home/ma-user/work/data/val.json --model-name deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B --output-dir /home/ma-user/work/output
+```
+
+其中，
+- `--train-data` 为训练集路径
+- `--val-data` 为验证集路径
+- `--model-name` 为基础模型名称或路径
+- `--output-dir` 为输出目录，用于保存训练好的模型和日志
+
 ### LoRA权重合并
-使用`merge.ipynb`合并LoRA权重与基础模型
+使用`merge.ipynb`合并LoRA权重与基础模型，同样可以使用传参的方式调用`merge.py`，如
+```bash
+python merge.py --base-model deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B --lora-path /home/ma-user/work/output/checkpoint-1380 --output-path /home/ma-user/work/merged_model
+```
 
-### 本地环境搭建
-1. 为便于环境搭建，推荐使用 anaconda 单独创建虚拟环境`conda create -n mindtrio python=3.10`
-2. 安装 `requirements.txt` 中的依赖包 `pip install -r requirements.txt`
+其中，
+- `--base-model` 为基础模型名称或路径
+- `--lora-path` 为训练好的 LoRA checkpoint 路径
+- `--output-path` 为合并后模型的保存目录
 
-### 使用脚本
-1. 提前将微调合并后的模型下载下来
-2. 通过传参的方式调用 `app.py`，将模型路径作为参数传入，如 `python app.py --model_path YOUR_PATH`
-3. 预计输出
-    ```bash
-    正在从 YOUR_PATH 加载模型...
-    Device set to use cuda:0
-    模型加载完成。
-    * Serving Flask app 'app'
-    * Debug mode: on
-    WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
-    * Running on http://127.0.0.1:5000
-    Press CTRL+C to quit
-    * Restarting with stat
-    正在从 YOUR_PATH 加载模型...
-    Device set to use cuda:0
-    模型加载完成。
-    * Debugger is active!
-    * Debugger PIN: 113-062-594
-    ```
-4. 在浏览器中打开 `http://127.0.0.1:5000` 后，就可以进行系统的使用
+### 系统使用
+gradio_app.py 采用动态加载方式，使用步骤为：
+1. 下载相关依赖
+2. `gradio_app.py` 脚本同样设置了传参的方式，如 `python gradio_app.py --base-model deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B --lora-checkpoint checkpoint-1380 --device-id 0`
+   - `--base-model` 为基础模型名称或路径
+   - `--lora-checkpoint` 为训练好的 LoRA checkpoint 路径
+   - `--device-id` 为使用的设备ID，默认值为 0
+3. 预期输出：
+```bash
+Base model: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+LoRA checkpoint: checkpoint-1380
+
+============================================================
+Configuring MindSpore Ascend NPU
+============================================================
+[OK] Ascend NPU configured (device_id=0)
+============================================================
+
+============================================================
+Loading Model (PyTorch Transformers + PEFT)
+============================================================
+
+[1/4] Loading tokenizer...
+      [OK] Tokenizer loaded
+
+[2/4] Loading base model...
+      [OK] Base model loaded
+      Model parameters: 1,777,088,000
+
+[3/4] Loading LoRA adapter...
+      [OK] LoRA adapter loaded
+
+[4/4] Moving model to NPU...
+      [OK] Model ready on NPU
+
+============================================================
+Model Ready!
+============================================================
+
+Running on local URL:  http://0.0.0.0:7860
+```
+4. 在浏览器中打开 http://localhost:7860 即可使用系统
