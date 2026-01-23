@@ -1,24 +1,23 @@
 import gradio as gr
 import mindspore as ms
+import sys
+import warnings
+warnings.filterwarnings('ignore')
+
+# 导入 mindnlp - 必须在 transformers 之前
+try:
+    import mindnlp
+    print(f"[INFO] MindNLP version: {mindnlp.__version__}")
+except Exception as e:
+    print(f"[WARNING] MindNLP import had issues: {str(e)[:100]}")
+
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import argparse
 import os
-import sys
 import traceback
 import time
-import torch
 
-# Try to import torch_npu for Ascend NPU support
-try:
-    import torch_npu
-    TORCH_NPU_AVAILABLE = True
-    print("[INFO] torch_npu is available")
-except ImportError:
-    TORCH_NPU_AVAILABLE = False
-    print("[WARNING] torch_npu not available, will use CPU")
-
-# Global variables for model and tokenizer
 model = None
 tokenizer = None
 
@@ -67,23 +66,12 @@ def load_model(base_model_name, lora_checkpoint_path):
 
     # Load base model
     print("\n[2/4] 加载基础模型...")
-
-    if TORCH_NPU_AVAILABLE:
-        print("      使用加速设备...")
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model_name,
-            torch_dtype=torch.float16,
-            device_map="npu:0",
-            trust_remote_code=True
-        )
-    else:
-        print("      使用CPU...")
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model_name,
-            torch_dtype=torch.float16,
-            trust_remote_code=True
-        )
-
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model_name,
+        ms_dtype=ms.bfloat16,
+        device_map=0,
+        trust_remote_code=True
+    )
     print("      [OK] 基础模型加载完成")
     print(f"      模型参数量: {model.num_parameters():,}")
 
@@ -92,10 +80,10 @@ def load_model(base_model_name, lora_checkpoint_path):
     model = PeftModel.from_pretrained(model, lora_checkpoint_path)
     print("      [OK] LoRA适配器加载完成")
 
-    # Verify final device
-    print("\n[4/4] 检查模型设备...")
-    actual_device = next(model.parameters()).device
-    print(f"      当前设备: {actual_device}")
+    # Move to NPU
+    print("\n[4/4] 移动模型到设备...")
+    model = model.to('npu:0')
+    print("      [OK] 模型已就绪")
 
     print("\n" + "=" * 60)
     print("模型就绪!")
@@ -120,40 +108,23 @@ def analyze_text(user_input):
             ],
             add_generation_prompt=True,
             tokenize=True,
-            return_tensors="pt",
+            return_tensors="ms",
             return_dict=True
         )
         print(f"      输入token数: {inputs['input_ids'].shape[1]}")
 
-        # 移动输入到模型设备
-        device = next(model.parameters()).device
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-        print(f"      输入已移至: {device}")
+        # 移动输入到NPU
+        inputs = {k: v.to('npu:0') for k, v in inputs.items()}
+        print(f"      输入已移至: npu:0")
 
-        # 生成配置 (根据设备调整)
+        # 生成配置
         print("[2/4] 配置生成参数...")
-        device = next(model.parameters()).device
-
-        if device.type == "npu":
-            # 使用完整配置
-            gen_kwargs = {
-                "max_length": 2500,
-                "do_sample": True,
-                "top_k": 1,
-                "pad_token_id": tokenizer.pad_token_id,
-                "eos_token_id": tokenizer.eos_token_id
-            }
-            print(f"      使用完整配置: max_length={gen_kwargs['max_length']}")
-        else:
-            # 使用快速配置
-            gen_kwargs = {
-                "max_new_tokens": 100,
-                "do_sample": False,
-                "pad_token_id": tokenizer.pad_token_id,
-                "eos_token_id": tokenizer.eos_token_id
-            }
-            print(f"      使用快速配置: max_new_tokens={gen_kwargs['max_new_tokens']}")
-            print(f"      提示: 使用加速设备可获得更好性能")
+        gen_kwargs = {
+            "max_length": 2500,
+            "do_sample": True,
+            "top_k": 1
+        }
+        print(f"      max_length: {gen_kwargs['max_length']}")
 
         # 生成回答
         print("[3/4] 开始生成...")

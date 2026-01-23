@@ -1,0 +1,22 @@
+mindspore>=2.7.0
+
+# PyTorch生态 (用于transformers和peft)
+transformers>=4.57.0
+peft>=0.18.0
+torch>=2.0.0
+accelerate>=1.0.0
+
+# Web界面
+gradio>=6.0.0
+
+# 数据处理
+numpy>=1.26.0
+pandas>=2.0.0
+
+# 模型相关
+safetensors>=0.6.0
+huggingface-hub>=0.36.0
+
+# 其他工具
+tqdm>=4.67.0
+psutil>=6.0.0
