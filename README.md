@@ -9,13 +9,43 @@
 本项目基于CDTB数据集，采用MindSpore框架微调DeepSeek-R1-Distill-Qwen-1.5B大模型，实现了中文篇章级句间关系识别任务。
 
 ### 技术栈与核心组件
-| 技术栈           | 版本/说明                         |
-| ---------------- | --------------------------------- |
-| 深度学习框架     | MindSpore                         |
-| NLP工具库        | mindnlp                           |
-| 大语言模型       | DeepSeek-R1-Distill-Qwen-1.5B     |
-| 参数高效微调方法 | LoRA (Low-Rank Adaptation)        |
-| 数据集           | CDTB (Chinese Discourse TreeBank) |
+<table>
+  <thead>
+    <tr>
+      <th>软件包</th>
+      <th>版本</th>
+      <th>安装方法</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>MindSpore NLP</td>
+      <td>0.5.1</td>
+      <td>pip install mindnlp==0.5.1</td>
+    </tr>
+    <tr>
+      <td>MindSpore</td>
+      <td rowspan="5" colspan="2">安装 MindSpore NLP 的时候自动选择适配版本安装</td>
+    </tr>
+    <tr>
+      <td>transformers</td>
+    </tr>
+    <tr>
+      <td>datasets</td>
+    </tr>
+    <tr>
+      <td>pandas</td>
+    </tr>
+    <tr>
+      <td>peft</td>
+    </tr>
+    <tr>
+      <td>gradio</td>
+      <td>6.3.0</td>
+      <td>pip install gradio==6.3.0</td>
+    </tr>
+  </tbody>
+</table>
 
 ### 核心技术实现细节
 
@@ -254,3 +284,4 @@ Model Ready!
 Running on local URL:  http://0.0.0.0:7860
 ```
 4. 在浏览器中打开 http://localhost:7860 即可使用系统
+
